@@ -3,7 +3,7 @@ function say(msg)
 end
 
 if current and type(current.Disconnect) == "function" then
-	current:Disconnect()
+    current:Disconnect()
 end
 
 if slashtorespond then
@@ -12,13 +12,51 @@ end
 
 function send(conversation_msg, conversation_id)
     conversation_msg = conversation_msg:gsub(" ", "+")
-    url              = "http://api.brainshop.ai/get?bid=169422&key=4GCemcdYgy50PlZ2&uid="..conversation_id.."&msg="..conversation_msg
+    local url = "https://api.llama.ai/v1/complete" -- LLaMA API endpoint
+
+    local requestBody = {
+        messages = {
+            { role = "user", content = conversation_msg }
+        },
+        functions = {
+            {
+                name = "get_current_weather",
+                description = "Get the current weather in a given location",
+                parameters = {
+                    type = "object",
+                    properties = {
+                        location = {
+                            type = "string",
+                            description = "The city and state, e.g. San Francisco, CA"
+                        },
+                        days = {
+                            type = "number",
+                            description = "for how many days ahead you want the forecast"
+                        },
+                        unit = { type = "string", enum = {"celsius", "fahrenheit"} }
+                    },
+                },
+                required = {"location", "days"}
+            }
+        },
+        stream = false,
+        function_call = "get_current_weather"
+    }
+
     local r = (syn and syn.request or http_request or request)({
-        Url    = url,
-        Method = "GET"
+        Url = url,
+        Method = "POST",
+        Headers = {
+            ["Authorization"] = "Bearer LA-28f7dad8ca9448f699a0415de82c9a7d95ff9ae80cc94fffa596f521873135a9",
+            ["Content-Type"] = "application/json"
+        },
+        Body = game.HttpService:JSONEncode(requestBody)
     })
-    if r.Success and #r.Body > 0 and game.HttpService:JSONDecode(r.Body).cnt and #game.HttpService:JSONDecode(r.Body).cnt > 0 then
-        return game.HttpService:JSONDecode(r.Body).cnt:gsub("BOT_NAME", bot_name):gsub("BOT_OWNER", bot_owner)..""
+
+    if r.Success and #r.Body > 0 then
+        local responseData = game.HttpService:JSONDecode(r.Body)
+        local reply = responseData.choices and responseData.choices[1] and responseData.choices[1].text or "No response from API."
+        return reply:gsub("BOT_NAME", bot_name):gsub("BOT_OWNER", bot_owner)
     end
 end
 
@@ -52,7 +90,7 @@ getgenv().current = game.ReplicatedStorage.DefaultChatSystemChatEvents.OnMessage
             recognized[plr.Name] = recognization_id
         end
         if recognized[plr.Name] ~= nil then
-            reply = send(msg, recognized[plr.Name])
+            local reply = send(msg, recognized[plr.Name])
             say(reply)
         end
     end
